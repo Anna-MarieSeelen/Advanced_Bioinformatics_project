@@ -1,0 +1,116 @@
+SAMPLES = ['20180613.A-1R1_R1', '20180605.A-1R2_R1', '20180613.A-1R3_R1',
+'20180605.A-1R4_R1', '20180605.A-1R5_R1',
+'20180613.A-3R1_R1', '20180605.A-3R2_R1', '20180605.A-3R3_R1',
+'20180613.A-3R4_R1', '20180605.A-3R5_R1',
+'20180613.A-13R1_R1', '20180613.A-13R2_R1', '20180613.A-13R3_R1',
+'20180613.A-13R4_R1', '20180613.A-13R5_R1',
+'20180605.A-17R1_R1', '20180605.A-17R2_R1', '20180605.A-17R3_R1',
+'20180605.A-17R4_R1', '20180613.A-17R5_R1',
+'20180605.A-23R1_R1', '20180605.A-23R2_R1', '20180605.A-23R3_R1',
+'20180605.A-23R4_R1', '20180605.A-23R5_R1',
+'20180605.A-24R1_R1', '20180605.A-24R2_R1', '20180605.A-24R3_R1',
+'20180605.A-24R4_R1', '20180605.A-24R5_R1',
+'20180613.A-25R1_R1', '20180605.A-25R2_R1', '20180605.A-25R3_R1',
+'20180605.A-25R4_R1', '20180605.A-25R5_R1',
+'20180605.A-30R1_R1', '20180605.A-30R2_R1', '20180605.A-30R3_R1',
+'20180605.A-30R4_R1', '20180605.A-30R5_R1',
+'20180613.A-37R1_R1', '20180605.A-37R2_R1', '20180605.A-37R3_R1',
+'20180613.A-37R4_R1', '20180605.A-37R5_R1',
+'20180605.A-38R1_R1', '20180605.A-38R2_R1', '20180605.A-38R3_R1',
+'20180605.A-38R5_R1',
+'20180613.A-40R1_R1', '20180605.A-40R2_R1', '20180605.A-40R3_R1',
+'20180605.A-40R4_R1', '20180605.A-40R5_R1']
+
+ANNOTATIONS = ['genes', 'Araport11_GTF_cleaned_chromosome_names']
+
+THREADS_MAX=4
+rule all:
+    input:
+        expand("../output/lastrun/stringtie/{annotation}/{sample}_st.gtf", annotation=ANNOTATIONS, sample=SAMPLES),
+        expand("../output/lastrun/fastqc/{sample}_trimmed_fastqc.html", sample=SAMPLES),
+        expand("../output/lastrun/index_bam/{sample}_hisat2.bam.bai", sample=SAMPLES),
+        expand("../output/lastrun/stringtie/{annotation}/gene_count_matrix.csv", annotation=ANNOTATIONS)
+
+rule trimmomatic:
+   input:
+        "../transcriptome/{sample}.fastq.gz"
+   output:
+        "../output/lastrun/trimmed/{sample}_trimmed.fq.gz"
+   threads: THREADS_MAX
+   shell:
+        "java -jar /local/prog/Trimmomatic-0.36/trimmomatic-0.36.jar SE "
+        "-threads {threads} -phred33 {input} {output} "
+        "ILLUMINACLIP:/local/prog/Trimmomatic-0.36/adapters/TruSeq3-SE.fa:2:30:10"
+        " LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36"
+
+rule fastqc:
+   input:
+       seq='../transcriptome/{sample}.fastq.gz',
+       trimmed_seq='../output/lastrun/trimmed/{sample}_trimmed.fq.gz',
+   output:
+       "../output/lastrun/fastqc/{sample}_trimmed_fastqc.html"
+   params:
+       outdir="../output/lastrun/fastqc", 
+   threads: THREADS_MAX
+   shell:
+       "fastqc {input.seq} {input.trimmed_seq} -o {params.outdir} -t {threads}"
+
+rule hisat2:
+   input:
+       reads="../output/lastrun/trimmed/{sample}_trimmed.fq.gz",
+       index="../genomes/TAIR.1.ht2"
+   output:
+       "../output/lastrun/hisat2/{sample}_hisat2.sam"
+   params:
+       index="../genomes/TAIR"
+   threads: THREADS_MAX
+   shell:
+       "hisat2 -p {threads} -x {params.index} -U {input.reads} -S {output}"
+
+rule samtools_bam_sort:
+   input:
+       "../output/lastrun/hisat2/{sample}_hisat2.sam",
+   output:
+       "../output/lastrun/hisat2/{sample}_hisat2.bam",
+   threads: THREADS_MAX
+   shell:
+       "samtools sort --threads {threads} {input} > {output}"
+
+rule stringtie:
+   input:
+       mapped_reads = "../output/lastrun/hisat2/{sample}_hisat2.bam", #file after it is sorted
+       annotation = "../genomes/{annotation}.gtf"
+   output:
+       "../output/lastrun/stringtie/{annotation}/{sample}_st.gtf"
+   threads: THREADS_MAX
+   shell:
+       "stringtie {input.mapped_reads} -G {input.annotation} -e -p {threads} -o {output}"
+
+rule index_bam: 
+# makes an index file for all the bam files so it can be visualized in IGV
+   input:
+       "../output/lastrun/hisat2/{sample}_hisat2.bam",
+   output:
+       "../output/lastrun/index_bam/{sample}_hisat2.bam.bai",
+   threads: THREADS_MAX
+   shell:
+       "samtools index -@ {threads} {input} {output}"
+
+rule list_samples:
+    output:
+        "../output/lastrun/stringtie/{annotation}/sample_lst.txt"
+    params:
+        annotation="{annotation}"
+    run:
+        with open(output[0], 'w') as out:
+            for sample in SAMPLES:
+                    out.write(f"{sample} ../output/lastrun/stringtie/{params.annotation}/{sample}_st.gtf\n")
+
+rule prepDE:
+    input:
+        "../output/lastrun/stringtie/{annotation}/sample_lst.txt"
+    output:
+        g = "../output/lastrun/stringtie/{annotation}/gene_count_matrix.csv",
+        t = "../output/lastrun/stringtie/{annotation}/transcript_count_matrix.csv"
+    shell:
+        "python3 ../python/prepDE.py3 -i '{input}' -g {output.g} -t {output.t}"
