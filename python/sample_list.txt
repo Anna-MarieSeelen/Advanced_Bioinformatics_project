@@ -1,0 +1,16 @@
+deseq_output//expressions_araport11_Axenic-Leaf130.tsv
+deseq_output//expressions_araport11_Axenic-Leaf131.tsv
+deseq_output//expressions_araport11_Axenic-Leaf15.tsv
+deseq_output//expressions_araport11_Axenic-Leaf434.tsv
+deseq_output//expressions_araport11_Axenic-Leaf48.tsv
+deseq_output//expressions_araport11_Axenic-Leaf51.tsv
+deseq_output//expressions_araport11_Axenic-Leaf53.tsv
+deseq_output//expressions_araport11_Axenic-Leaf70.tsv
+deseq_output//expressions_genes_Axenic-Leaf130.tsv
+deseq_output//expressions_genes_Axenic-Leaf131.tsv
+deseq_output//expressions_genes_Axenic-Leaf15.tsv
+deseq_output//expressions_genes_Axenic-Leaf434.tsv
+deseq_output//expressions_genes_Axenic-Leaf48.tsv
+deseq_output//expressions_genes_Axenic-Leaf51.tsv
+deseq_output//expressions_genes_Axenic-Leaf53.tsv
+deseq_output//expressions_genes_Axenic-Leaf70.tsv
